@@ -17,6 +17,7 @@ pca = PCA()
 pipe = Pipeline(steps=[('pca', pca), ('logistic', logistic)])
 
 digits = datasets.load_digits()
+print(digits)
 X_digits = digits.data
 print(X_digits)
 y_digits = digits.target
