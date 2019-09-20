@@ -154,7 +154,7 @@ print("Grid Search started")
 gsearch.fit(X_train, y_train)
 
 print("cv_results_:")
-# df_cv = pd.DataFrame.from_dict(gsearch.cv_results_)
+df_cv = pd.DataFrame.from_dict(gsearch.cv_results_)
 # print(pd.DataFrame.from_dict(gsearch1.cv_results_))
 
 print("best_params_:")
