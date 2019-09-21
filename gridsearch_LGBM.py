@@ -226,7 +226,7 @@ print("****************** Predicting******************")
 
 # y_pred = gsearch.predict_proba(X_test)
 
-print("AUC for test set: ", roc_auc_score(y_test, y_pred[:, 1]))
+# print("AUC for test set: ", roc_auc_score(y_test, y_pred[:, 1]))
 
 #
 params['num_leaves'] = 600
