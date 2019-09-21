@@ -98,10 +98,18 @@ numerical_features = ['TransactionAmt', 'C1', 'C2', 'C6', 'C11', 'C13', 'C14']
 null_list2 = ['D4', 'D6', 'D12', 'D14']
 # Numeric columns which have NULL values replaced with -1
 null_list1 = ['dist1', 'dist2', 'D1', 'D2', 'D7', 'D8', 'D9']
+
 # Categorical feature list
-cat_list = ['ProductCD', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'card4', 'id_23']
+# categorical variables replace missing with None
+cat_list1 = ['ProductCD', 'card4', 'P_emaildomain', 'R_emaildomain',
+             'id_12', 'id_15', 'id_16', 'id_23', 'id_27', 'id_28',
+             'id_29', 'id_34', 'id_35', 'id_36', 'id_37', 'id_38',
+             'DeviceType']
+# Categorical features which require some factor levels to be combined
+cat_list2 = ['card6']
+cat_list = ['ProductCD', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'card4', ]
 print("Full predictor list: ")
-print(numerical_features+null_list1+null_list2+cat_list)
+print(numerical_features+null_list1+null_list2+cat_list1)
 
 
 # Defining the steps in the numerical pipeline
@@ -115,8 +123,8 @@ numerical_pipeline2 = Pipeline(steps=[('num_selector', FeatureSelector(null_list
 numerical_pipeline3 = Pipeline(steps=[('num_selector', FeatureSelector(null_list1)),
                                       ('imputer', SimpleImputer(strategy="constant", fill_value=-1))])
 
-categorical_pipeline = Pipeline(steps=[('cat_selector', FeatureSelector(cat_list)),
-                                       ('imputer', SimpleImputer(strategy="constant", fill_value='F')),
+categorical_pipeline = Pipeline(steps=[('cat_selector', FeatureSelector(cat_list1)),
+                                       ('imputer', SimpleImputer(strategy="constant", fill_value=None)),
                                        ('one_hot_encoder', OneHotEncoder(sparse=False, drop='first'))])
 
 # Combining numerical and categorical pipeline into one full big pipeline horizontally
