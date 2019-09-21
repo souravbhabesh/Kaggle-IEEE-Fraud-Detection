@@ -231,6 +231,7 @@ y_pred = final_pipeline.predict_proba(df_test)
 df_score = pd.DataFrame({'isFraud': y_pred[:, 1]})
 df_score['TransactionID'] = df_test['TransactionID']
 df_score = df_score[['TransactionID', 'isFraud']]
+
 print(df_score.head())
 
 df_score.to_csv('Data/Submission/submission.csv', index=False)
