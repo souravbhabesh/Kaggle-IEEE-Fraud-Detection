@@ -191,10 +191,10 @@ params = {'activation':'relu',
           'beta_2':0.999,
           'early_stopping':False,
           'epsilon':1e-08,
-          'hidden_layer_sizes': (20, 20),
+          # 'hidden_layer_sizes': (20, 20),
           'learning_rate':'constant',
           'learning_rate_init': 0.001,
-          #'max_iter': 200,
+          'max_iter': 200,
           'momentum': 0.9,
           'n_iter_no_change': 10,
           'nesterovs_momentum': True,
@@ -212,7 +212,7 @@ pipe = Pipeline(steps=[('full_pipeline', full_pipeline),
                        ('model', nn)])
 # Grid search for n_estimators
 param_grid = {
-    'model__max_iter': range(100, 601, 200)
+    'model__hidden_layer_sizes': [(20,20), (25,25), (30,30)]
 }
 
 gsearch = GridSearchCV(
@@ -241,8 +241,8 @@ y_pred = gsearch.predict_proba(X_test)
 
 print("AUC for test set: ", roc_auc_score(y_test, y_pred[:, 1]))
 
-exit(-1)
-params['max_iter'] = gsearch.best_params_['model__max_iter']
+# exit(-1)
+params['max_iter'] = gsearch.best_params_['model__hidden_layer_sizes']
 nn_final = MLPClassifier(**params)
 final_pipeline = Pipeline(steps=[('full_pipeline', full_pipeline),
                                  ('model', nn_final)])
