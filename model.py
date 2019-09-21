@@ -5,6 +5,7 @@
 
 import numpy as np  # linear algebra
 import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
+from pprint import pprint
 
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.max_rows', 500)
@@ -30,7 +31,7 @@ df_identity = pd.read_csv('Data/train_identity.csv')
 
 df_full = pd.merge(df_transaction, df_identity, left_on='TransactionID', right_on='TransactionID', how='left')
 
-df_full = df_full[:100]
+df_full = df_full[:1000]
 
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -44,7 +45,7 @@ from sklearn.pipeline import FeatureUnion, Pipeline
 class FeatureSelector(BaseEstimator, TransformerMixin):
     # Class Constructor
     def __init__(self, feature_names):
-        self._feature_names = feature_names
+        self.feature_names = feature_names
 
     # Return self nothing else to do here
     def fit(self, X, y=None):
@@ -52,8 +53,8 @@ class FeatureSelector(BaseEstimator, TransformerMixin):
 
     # Method that describes what we need this transformer to do
     def transform(self, X, y=None):
-        print("Feature Selector")
-        return X[self._feature_names].to_numpy()
+        # print("Feature Selector")
+        return X[self.feature_names].to_numpy()
 
 
 # Custom transformer for Numerical variables
@@ -72,7 +73,7 @@ class NumericalTransformer(BaseEstimator, TransformerMixin):
         # Check if needed
         if self._impute_C:
             # Impute columns matching C*
-            X = X.fillna(0) # this doesn't work
+            X = X.fillna(0)  # this doesn't work
         #     # create new column
         #     X.loc[:, 'bath_per_bed'] = X['bathrooms'] / X['bedrooms']
         #     # drop redundant column
@@ -96,11 +97,11 @@ null_list2 = ['D4', 'D6', 'D12', 'D14']
 
 # Defining the steps in the numerical pipeline
 numerical_pipeline1 = Pipeline(steps=[('num_selector', FeatureSelector(numerical_features)),
-                                      ('imputer', SimpleImputer(strategy="constant",fill_value=0))])
-                                     #('imputeC', NumericalTransformer(impute_C=True))])
+                                      ('imputer', SimpleImputer(strategy="constant", fill_value=0))])
+# ('imputeC', NumericalTransformer(impute_C=True))])
 
 numerical_pipeline2 = Pipeline(steps=[('num_selector', FeatureSelector(null_list2)),
-                                      ('imputer', SimpleImputer(strategy="constant",fill_value=-200))])
+                                      ('imputer', SimpleImputer(strategy="constant", fill_value=-200))])
 
 # Combining numerical and categorical pipeline into one full big pipeline horizontally
 # using FeatureUnion
@@ -122,22 +123,23 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 # Use combined features to transform dataset:
 X_features = full_pipeline.fit(X_train, y_train).transform(X_train)
 print("Combined space has", X_features.shape[1], "features")
-print(X_features)
+# print(X_features[:,10])
 
 from sklearn.svm import SVC
+
 svm = SVC(kernel="linear")
 
 # Do grid search over k, n_components and C:
 
 pipeline = Pipeline([("features", full_pipeline), ("svm", svm)])
 #
-param_grid = dict(features__pca__n_components=[1, 2, 3],
-                  features__univ_select__k=[1, 2],
-                  svm__C=[0.1, 1, 10])
+param_grid = dict(  # features__pca__n_components=[1, 2, 3],
+    # features__univ_select__k=[1, 2],
+    svm__C=[0.1, 1, 10])
 
 grid_search = GridSearchCV(pipeline, param_grid=param_grid, cv=5, verbose=10)
 print("Grid search started")
-grid_search.fit(X_train, y_train)
+# grid_search.fit(X_train, y_train)
 
 
 # The full pipeline as a step in another pipeline with an estimator as the final step
@@ -160,15 +162,15 @@ pipe = Pipeline(steps=[('full_pipeline', full_pipeline),
                        ('model', rf)])
 # Grid search for n_estimators
 param_grid = {
-    'model__n_estimators': [20, 30]
+    'model__n_estimators': range(200, 1001, 200)
 }
 
 gsearch = GridSearchCV(
     estimator=pipe,
     param_grid=param_grid,
-    # scoring='roc_auc',
-    # n_jobs=-1,
-    # iid=False,
+    scoring='roc_auc',
+    n_jobs=-1,
+    iid=False,
     verbose=1000,
     cv=3)
 
@@ -177,11 +179,11 @@ print("Grid Search started")
 gsearch.fit(X_train, y_train)
 
 print("cv_results_:")
-# df_cv = pd.DataFrame.from_dict(gsearch.cv_results_)
-# print(pd.DataFrame.from_dict(gsearch1.cv_results_))
+df_cv = pd.DataFrame.from_dict(gsearch.cv_results_)
+pprint(pd.DataFrame.from_dict(gsearch.cv_results_))
 
 print("best_params_:")
-# print(gsearch.best_params_)
+print(gsearch.best_params_)
 
 
-# print(gsearch.best_score_)
+print(gsearch.best_score_)
