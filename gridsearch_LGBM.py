@@ -191,33 +191,16 @@ params['sub_feature'] = 0.5
 params['num_leaves'] = 2000
 # params['min_data'] = 20
 params['min_data_in_leaf'] = 200
-params['max_depth'] = 7
+params['max_depth'] = -1
 params['is_unbalance'] = True
 params['max_bin'] = 300
 lgbm = LGBMClassifier(**params)
 
-# The full pipeline as a step in another pipeline with an estimator as the final step
-rf = RandomForestClassifier(min_samples_split=500,
-                            min_samples_leaf=50,
-                            max_depth=8,
-                            max_features="sqrt",
-                            class_weight='balanced',
-                            random_state=10)
-# full_pipeline_m = Pipeline(steps=[('full_pipeline', full_pipeline), ('model', rf)])
-
-# Can call fit on it just like any other pipeline
-# full_pipeline_m.fit(X_train, y_train)
-
-# Can predict with it like any other pipeline
-# y_pred = full_pipeline_m.predict(X_test)
-# print(X_test.shape)
-# print(y_pred.shape)
-# print("Modeling complete")
 pipe = Pipeline(steps=[('full_pipeline', full_pipeline),
                        ('model', lgbm)])
 # Grid search for n_estimators
 param_grid = {
-    'model__num_leaves': range(60, 80, 10)
+    'model__num_leaves': range(100, 601, 100)
 }
 
 gsearch = GridSearchCV(
