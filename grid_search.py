@@ -101,16 +101,15 @@ null_list1 = ['dist1', 'dist2', 'D1', 'D2', 'D7', 'D8', 'D9']
 
 # Categorical feature list
 # categorical variables replace missing with None
-cat_list1 = ['ProductCD', 'card4', 'P_emaildomain', 'R_emaildomain',
+cat_list1 = ['ProductCD', 'card4',
              'id_12', 'id_15', 'id_16', 'id_23', 'id_27', 'id_28',
              'id_29', 'id_34', 'id_35', 'id_36', 'id_37', 'id_38',
              'DeviceType']
 # Categorical features which require some factor levels to be combined
-cat_list2 = ['card6']
+cat_list2 = ['card6', 'P_emaildomain', 'R_emaildomain']
 cat_list = ['ProductCD', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'card4', ]
 print("Full predictor list: ")
-print(numerical_features+null_list1+null_list2+cat_list1)
-
+print(numerical_features + null_list1 + null_list2 + cat_list1)
 
 # Defining the steps in the numerical pipeline
 numerical_pipeline1 = Pipeline(steps=[('num_selector', FeatureSelector(numerical_features)),
