@@ -41,6 +41,7 @@ from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.decomposition import PCA
 from sklearn.feature_selection import SelectKBest
 from sklearn.preprocessing import Normalizer
+from sklearn.metrics import roc_auc_score
 
 # Building the model using the feature pipeline
 from lightgbm import LGBMClassifier
@@ -188,8 +189,6 @@ params['boosting_type'] = 'gbdt'
 params['objective'] = 'binary'
 params['metric'] = 'binary_logloss'
 params['sub_feature'] = 0.5
-params['num_leaves'] = 2000
-# params['min_data'] = 20
 params['min_data_in_leaf'] = 200
 params['max_depth'] = -1
 params['is_unbalance'] = True
@@ -214,41 +213,26 @@ gsearch = GridSearchCV(
 
 print("Grid Search started")
 # print(X.head())
-gsearch.fit(X_train, y_train)
+# gsearch.fit(X_train, y_train)
 
 print("cv_results_:")
-df_cv = pd.DataFrame.from_dict(gsearch.cv_results_)
-pprint(pd.DataFrame.from_dict(gsearch.cv_results_))
+# df_cv = pd.DataFrame.from_dict(gsearch.cv_results_)
+# pprint(pd.DataFrame.from_dict(gsearch.cv_results_))
 
 print("best_params_:")
-print(gsearch.best_params_)
+# print(gsearch.best_params_)
 
 print("****************** Predicting******************")
 
-# rf_final = gsearch.best_estimator_
-# final_pipeline = Pipeline(steps=[('full_pipeline', full_pipeline),
-#                                  ('model', rf_final)])
-#
-# # Can call fit on it just like any other pipeline
-# final_pipeline.fit(X_train, y_train)
-
-y_pred = gsearch.predict_proba(X_test)
-
-from sklearn.metrics import roc_auc_score
+# y_pred = gsearch.predict_proba(X_test)
 
 print("AUC for test set: ", roc_auc_score(y_test, y_pred[:, 1]))
 
-exit(-1)
 #
-rf_final = RandomForestClassifier(n_estimators=550,
-                                  min_samples_split=500,
-                                  min_samples_leaf=50,
-                                  max_depth=8,
-                                  max_features="sqrt",
-                                  class_weight='balanced',
-                                  random_state=10)
+params['num_leaves'] = 600
+lgbm_final = LGBMClassifier(**params)
 final_pipeline = Pipeline(steps=[('full_pipeline', full_pipeline),
-                                 ('model', rf_final)])
+                                 ('model', lgbm_final)])
 
 # Can call fit on it just like any other pipeline
 final_pipeline.fit(X_train, y_train)
