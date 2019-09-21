@@ -32,7 +32,7 @@ df_identity = pd.read_csv('Data/train_identity.csv')
 
 df_full = pd.merge(df_transaction, df_identity, left_on='TransactionID', right_on='TransactionID', how='left')
 
-# df_full = df_full[:1000]
+# df_full = df_full[:10000]
 
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -57,6 +57,11 @@ class FeatureSelector(BaseEstimator, TransformerMixin):
         # print("Feature Selector")
         return X[self.feature_names].to_numpy()
 
+
+# Function transformer for bucketing categorical variables
+# def refactor(X):
+#     x.shape[1]
+#     np.unique(x[:, 0])
 
 # Custom transformer for Numerical variables
 class NumericalTransformer(BaseEstimator, TransformerMixin):
@@ -98,6 +103,12 @@ numerical_features = ['TransactionAmt', 'C1', 'C2', 'C6', 'C11', 'C13', 'C14']
 null_list2 = ['D4', 'D6', 'D12', 'D14']
 # Numeric columns which have NULL values replaced with -1
 null_list1 = ['dist1', 'dist2', 'D1', 'D2', 'D7', 'D8', 'D9']
+# PCA list
+v_list=[]
+for col in df_full:
+    if 'V' in col:
+        # print(col)
+        v_list.append(col)
 
 # Categorical feature list
 # categorical variables replace missing with None
@@ -108,6 +119,7 @@ cat_list1 = ['ProductCD', 'card4',
 # Categorical features which require some factor levels to be combined
 cat_list2 = ['card6', 'P_emaildomain', 'R_emaildomain']
 cat_list = ['ProductCD', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'card4', ]
+
 print("Full predictor list: ")
 print(numerical_features + null_list1 + null_list2 + cat_list1)
 
@@ -126,11 +138,27 @@ categorical_pipeline = Pipeline(steps=[('cat_selector', FeatureSelector(cat_list
                                        ('imputer', SimpleImputer(strategy="constant", fill_value=None)),
                                        ('one_hot_encoder', OneHotEncoder(sparse=False, drop='first'))])
 
+from sklearn.decomposition import PCA
+from sklearn.feature_selection import SelectKBest
+from sklearn.preprocessing import Normalizer
+
+# This dataset is way too high-dimensional. Better do PCA:
+pca = PCA(n_components=2)
+
+# Maybe some original features where good, too?
+selection = SelectKBest(k=1)
+
+pca_pipeline = Pipeline(steps=[('pca_selector', FeatureSelector(v_list)),
+                               ('imputer', SimpleImputer(strategy="constant", fill_value=-1)),
+                               ('normalizer', Normalizer(copy=False)),
+                               ('pca_kbest', FeatureUnion([("pca", pca), ("univ_select", selection)]))])
+
 # Combining numerical and categorical pipeline into one full big pipeline horizontally
 # using FeatureUnion
 full_pipeline = FeatureUnion(transformer_list=[('numerical_pipeline1', numerical_pipeline1),
                                                ('numerical_pipeline2', numerical_pipeline2),
                                                ('numerical_pipeline3', numerical_pipeline3),
+                                               ('pca_pipeline', pca_pipeline),
                                                ('categorical_pipeline', categorical_pipeline)])
 
 # Building the model using the feature pipeline
