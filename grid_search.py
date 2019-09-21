@@ -6,6 +6,7 @@
 import numpy as np  # linear algebra
 import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
 from pprint import pprint
+from sklearn.preprocessing import OneHotEncoder
 
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.max_rows', 500)
@@ -97,6 +98,11 @@ numerical_features = ['TransactionAmt', 'C1', 'C2', 'C6', 'C11', 'C13', 'C14']
 null_list2 = ['D4', 'D6', 'D12', 'D14']
 # Numeric columns which have NULL values replaced with -1
 null_list1 = ['dist1', 'dist2', 'D1', 'D2', 'D7', 'D8', 'D9']
+# Categorical feature list
+cat_list = ['ProductCD', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'card4', 'id_23']
+print("Full predictor list: ")
+print(numerical_features+null_list1+null_list2+cat_list)
+
 
 # Defining the steps in the numerical pipeline
 numerical_pipeline1 = Pipeline(steps=[('num_selector', FeatureSelector(numerical_features)),
@@ -109,11 +115,16 @@ numerical_pipeline2 = Pipeline(steps=[('num_selector', FeatureSelector(null_list
 numerical_pipeline3 = Pipeline(steps=[('num_selector', FeatureSelector(null_list1)),
                                       ('imputer', SimpleImputer(strategy="constant", fill_value=-1))])
 
+categorical_pipeline = Pipeline(steps=[('cat_selector', FeatureSelector(cat_list)),
+                                       ('imputer', SimpleImputer(strategy="constant", fill_value='F')),
+                                       ('one_hot_encoder', OneHotEncoder(sparse=False, drop='first'))])
+
 # Combining numerical and categorical pipeline into one full big pipeline horizontally
 # using FeatureUnion
 full_pipeline = FeatureUnion(transformer_list=[('numerical_pipeline1', numerical_pipeline1),
                                                ('numerical_pipeline2', numerical_pipeline2),
-                                               ('numerical_pipeline3', numerical_pipeline3)])
+                                               ('numerical_pipeline3', numerical_pipeline3),
+                                               ('categorical_pipeline', categorical_pipeline)])
 
 # Building the model using the feature pipeline
 from sklearn.ensemble import RandomForestClassifier
@@ -126,7 +137,7 @@ X = df_full.drop('isFraud', axis=1)
 # You can covert the target variable to numpy
 y = df_full['isFraud'].values
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 # Use combined features to transform dataset:
 X_features = full_pipeline.fit(X_train, y_train).transform(X_train)
 print("Shape of combined space ", X_features.shape, "features")
@@ -135,7 +146,7 @@ print("Combined space has", X_features.shape[1], "features")
 
 from sklearn.svm import SVC
 
-svm = SVC(kernel="linear")
+svm = SVC(kernel="poly", probability=True)
 
 # Do grid search over k, n_components and C:
 
@@ -155,6 +166,7 @@ rf = RandomForestClassifier(min_samples_split=500,
                             min_samples_leaf=50,
                             max_depth=8,
                             max_features="sqrt",
+                            class_weight='balanced',
                             random_state=10)
 # full_pipeline_m = Pipeline(steps=[('full_pipeline', full_pipeline), ('model', rf)])
 
@@ -205,15 +217,17 @@ print("****************** Predicting******************")
 # y_pred = gsearch.predict_proba(X_test)
 
 from sklearn.metrics import roc_auc_score
+
 # print("AUC for test set: ", roc_auc_score(y_test, y_pred[:, 1]))
 
 #
 rf_final = RandomForestClassifier(n_estimators=550,
-                            min_samples_split=500,
-                            min_samples_leaf=50,
-                            max_depth=8,
-                            max_features="sqrt",
-                            random_state=10)
+                                  min_samples_split=500,
+                                  min_samples_leaf=50,
+                                  max_depth=8,
+                                  max_features="sqrt",
+                                  class_weight='balanced',
+                                  random_state=10)
 final_pipeline = Pipeline(steps=[('full_pipeline', full_pipeline),
                                  ('model', rf_final)])
 
