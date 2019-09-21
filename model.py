@@ -31,7 +31,7 @@ df_identity = pd.read_csv('Data/train_identity.csv')
 
 df_full = pd.merge(df_transaction, df_identity, left_on='TransactionID', right_on='TransactionID', how='left')
 
-df_full = df_full[:1000]
+# df_full = df_full[:1000]
 
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -169,7 +169,7 @@ gsearch = GridSearchCV(
     estimator=pipe,
     param_grid=param_grid,
     scoring='roc_auc',
-    n_jobs=-1,
+    # n_jobs=2,
     iid=False,
     verbose=1000,
     cv=3)
