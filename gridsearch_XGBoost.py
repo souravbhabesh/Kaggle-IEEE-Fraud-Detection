@@ -180,7 +180,7 @@ print("Combined space has", X_features.shape[1], "features")
 # print(X_features[:,10])
 
 
-# LGBM model
+# XGBoost model
 params = {'learning_rate': 0.1,
           'n_estimators': 1000,
           'max_depth': 5,
@@ -196,7 +196,7 @@ params = {'learning_rate': 0.1,
 xgb = XGBClassifier(**params)
 
 pipe = Pipeline(steps=[('full_pipeline', full_pipeline),
-                       ('model', lgbm)])
+                       ('model', xgb)])
 # Grid search for n_estimators
 param_grid = {
     'model__max_depth': range(3, 10, 2),
