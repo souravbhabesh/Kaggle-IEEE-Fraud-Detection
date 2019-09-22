@@ -184,15 +184,15 @@ print("Combined space has", X_features.shape[1], "features")
 
 # Neural Network model
 
-params = {'activation':'relu',
-          'alpha':1e-05,
-          'batch_size':'auto',
-          'beta_1':0.9,
-          'beta_2':0.999,
-          'early_stopping':False,
-          'epsilon':1e-08,
+params = {'activation': 'relu',
+          'alpha': 1e-05,
+          'batch_size': 'auto',
+          'beta_1': 0.9,
+          'beta_2': 0.999,
+          'early_stopping': False,
+          'epsilon': 1e-08,
           # 'hidden_layer_sizes': (20, 20),
-          'learning_rate':'constant',
+          'learning_rate': 'constant',
           'learning_rate_init': 0.001,
           'max_iter': 200,
           'momentum': 0.9,
@@ -202,7 +202,7 @@ params = {'activation':'relu',
           'random_state': 1,
           'shuffle': True,
           'solver': 'sgd',
-          'tol': 0.0001,
+          'tol': 0.00005,
           'validation_fraction': 0.1,
           'verbose': True,
           'warm_start': False}
@@ -212,7 +212,7 @@ pipe = Pipeline(steps=[('full_pipeline', full_pipeline),
                        ('model', nn)])
 # Grid search for n_estimators
 param_grid = {
-    'model__hidden_layer_sizes': [(20,20), (25,25), (30,30)]
+    'model__hidden_layer_sizes': [(30, 30, 30, 10)]
 }
 
 gsearch = GridSearchCV(
@@ -242,7 +242,7 @@ y_pred = gsearch.predict_proba(X_test)
 print("AUC for test set: ", roc_auc_score(y_test, y_pred[:, 1]))
 
 # exit(-1)
-params['max_iter'] = gsearch.best_params_['model__hidden_layer_sizes']
+params['hidden_layer_sizes'] = gsearch.best_params_['model__hidden_layer_sizes']
 nn_final = MLPClassifier(**params)
 final_pipeline = Pipeline(steps=[('full_pipeline', full_pipeline),
                                  ('model', nn_final)])
