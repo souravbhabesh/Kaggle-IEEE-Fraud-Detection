@@ -45,19 +45,10 @@ df_identity = pd.read_csv('Data/train_identity.csv')
 
 df_full = pd.merge(df_transaction, df_identity, left_on='TransactionID', right_on='TransactionID', how='left')
 
-# df_full = df_full[:10000]
-
-# Train Test split
-X = df_full.drop('isFraud', axis=1)
-# You can covert the target variable to numpy
-y = df_full['isFraud'].values
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-
 
 # Utility functions
-def percentageFraud(df_train, df_test, col, target='isFraud'):
-    table_train = pd.crosstab(df_train[col], df_train[target])
+def percentageFraud(df, col, target='isFraud'):
+    table_train = pd.crosstab(df[col], df[target])
     table_train['%fraud'] = (table_train[1] / (table_train[0] + table_train[1])) * 100
     table_train = table_train.sort_values(by='%fraud', ascending=False)
     table_train['index'] = table_train.index
@@ -73,8 +64,19 @@ def percentageFraud(df_train, df_test, col, target='isFraud'):
         factor_levels.discard(key)
     for key in factor_levels:
         factor_dict[key] = 'other'
-    pprint(factor_dict)
+    # pprint(factor_dict)
     return factor_dict
+
+cat_list3 = ['P_emaildomain','card6', 'R_emaildomain', 'id_30', 'id_31', 'id_33', 'id_34']
+for col in cat_list3:
+    df_full[col] = df_full[col].map(percentageFraud(df=df_full, col=col))
+
+df_full = df_full[:200000]
+# Train Test split
+X = df_full.drop('isFraud', axis=1)
+# You can covert the target variable to numpy
+y = df_full['isFraud'].values
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.05, random_state=42, stratify=y)
 
 
 # Custom Transformer that extracts columns passed as argument to its constructor
@@ -136,21 +138,25 @@ class CategoricalTransformer(BaseEstimator, TransformerMixin):
     def __init__(self, factor_dict):
         self.factor_dict = factor_dict
 
+    # Helper function that converts values to Binary depending on input
+    def replace_factor(self, obj):
+        return self.factor_dict[obj]
+
     # Return self nothing else to do here
     def fit(self, X, y=None):
         return self
 
     # Transformer method we wrote for this transformer
     def transform(self, X, y=None):
-        X.loc[:, 'P_emaildomain'] = X['P_emaildomain'].map(self.factor_dict)
+        X['P_emaildomain'] = X['P_emaildomain'].apply(self.replace_factor)
         # returns numpy array
         return X.values
 
 
 # Numerical features to pass down the numerical pipeline, replace missing with 0
-numerical_features = ['TransactionAmt', 'C1', 'C2', 'C6', 'C11', 'C13', 'C14']
+numerical_features = ['TransactionAmt', 'C1', 'C2', 'C6', 'C11', 'C13', 'C14', 'addr1', 'card3', 'id_02']
 # Numeric columns which have NULL values replaced with -200
-null_list2 = ['D4', 'D6', 'D12', 'D14']
+null_list2 = ['D4', 'D6', 'D12', 'D14', 'id_01', 'id_03', 'id_05', 'id_06', 'id_07', 'id_08', 'id_09', 'id_10']
 # Numeric columns which have NULL values replaced with -1
 null_list1 = ['dist1', 'dist2', 'D1', 'D2', 'D7', 'D8', 'D9']
 # PCA list
@@ -167,7 +173,7 @@ cat_list1 = ['ProductCD', 'card4',
              'id_29', 'id_34', 'id_35', 'id_36', 'id_37', 'id_38',
              'DeviceType']
 # Categorical features which require some factor levels to be combined
-cat_list3 = ['P_emaildomain']
+
 cat_list2 = ['card6', 'P_emaildomain', 'R_emaildomain']
 cat_list = ['ProductCD', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'card4', ]
 
@@ -190,8 +196,13 @@ categorical_pipeline = Pipeline(steps=[('cat_selector', FeatureSelector(cat_list
                                        ('one_hot_encoder', OneHotEncoder(sparse=False, drop='first'))])
 
 cat_pipe = Pipeline(steps=[('cat_selector', FeatureSelector(cat_list3)),
-'condense_factor', CategoricalTransformer(factor_dict=percentageFraud(df_train, df_test, col, target='isFraud')),
+                           ('imputer', SimpleImputer(strategy="constant", fill_value='Missing')),
                            ('one_hot_encoder', OneHotEncoder(sparse=False, drop='first'))])
+
+# print("Applying cat pipe")
+# cat_features = cat_pipe.fit(X_train, y_train).transform(X_train)
+# print("Shape of combined space ", cat_features.shape, "features")
+# print("Combined space has", cat_features.shape[1], "features")
 
 # This dataset is way too high-dimensional. Better do PCA:
 pca = PCA(n_components=2)
@@ -239,8 +250,8 @@ pipe = Pipeline(steps=[('full_pipeline', full_pipeline),
                        ('model', xgb)])
 # Grid search for n_estimators
 param_grid = {
-    'model__max_depth': range(3, 10, 2),
-    'model__min_child_weight': range(1, 6, 2)
+    'model__max_depth': range(7, 8, 1),
+    'model__min_child_weight': range(1, 3, 1)
 }
 
 gsearch = GridSearchCV(
@@ -250,7 +261,7 @@ gsearch = GridSearchCV(
     # n_jobs=2,
     iid=False,
     verbose=1000,
-    cv=3)
+    cv=10)
 
 print("Grid Search started")
 # print(X.head())
@@ -267,13 +278,16 @@ print("****************** Predicting******************")
 
 y_pred = gsearch.predict_proba(X_test)
 
-print("AUC for test set: ", roc_auc_score(y_test, y_pred[:, 1]))
+# print("AUC for test set: ", roc_auc_score(y_test, y_pred[:, 1]))
 
 #
-params.update(gsearch.best_params_)
-xgb_final = XGBClassifier(**params)
-final_pipeline = Pipeline(steps=[('full_pipeline', full_pipeline),
-                                 ('model', xgb_final)])
+# params.update({
+#     'max_depth': 3,
+#     'min_child_weight': 1
+# })
+# xgb_final = XGBClassifier(**params)
+# final_pipeline = Pipeline(steps=[('full_pipeline', full_pipeline),
+#                                  ('model', xgb_final)])
 
 # Can call fit on it just like any other pipeline
 final_pipeline.fit(X_train, y_train)
@@ -282,9 +296,15 @@ print("AUC for test set: ", roc_auc_score(y_test, final_pipeline.predict_proba(X
 print("******************** Generating the submission file******************")
 df_transaction_test = pd.read_csv('Data/test_transaction.csv')
 df_identity_test = pd.read_csv('Data/test_identity.csv')
+df_identity_test = pd.read_csv('Data/test_identity.csv')
 df_test = pd.merge(df_transaction_test, df_identity_test, left_on='TransactionID', right_on='TransactionID', how='left')
 
-y_pred = final_pipeline.predict_proba(df_test)
+# df_test = pd.read_csv('../input/ieee-fraud-detection/shard1.csv')
+
+df_test = df_test[:10000]
+
+print("Applying final pipeline to 10000 rows ")
+y_pred = gsearch.predict_proba(df_test)
 
 df_score = pd.DataFrame({'isFraud': y_pred[:, 1]})
 df_score['TransactionID'] = df_test['TransactionID']
@@ -292,4 +312,4 @@ df_score = df_score[['TransactionID', 'isFraud']]
 
 print(df_score.head())
 
-df_score.to_csv('Data/Submission/submission.csv', index=False)
+df_score.to_csv('Data/submission.csv', index=False)
