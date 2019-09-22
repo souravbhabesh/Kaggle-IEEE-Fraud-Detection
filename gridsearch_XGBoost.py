@@ -44,9 +44,10 @@ from sklearn.preprocessing import Normalizer
 from sklearn.metrics import roc_auc_score
 
 # Building the model using the feature pipeline
-from lightgbm import LGBMClassifier
+from xgboost import XGBClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import GridSearchCV
+
 
 # Custom Transformer that extracts columns passed as argument to its constructor
 # BaseEstimator and TransformerMixin are base classes which are inherited
@@ -112,7 +113,7 @@ null_list2 = ['D4', 'D6', 'D12', 'D14']
 # Numeric columns which have NULL values replaced with -1
 null_list1 = ['dist1', 'dist2', 'D1', 'D2', 'D7', 'D8', 'D9']
 # PCA list
-v_list=[]
+v_list = []
 for col in df_full:
     if 'V' in col:
         # print(col)
@@ -146,7 +147,6 @@ categorical_pipeline = Pipeline(steps=[('cat_selector', FeatureSelector(cat_list
                                        ('imputer', SimpleImputer(strategy="constant", fill_value=None)),
                                        ('one_hot_encoder', OneHotEncoder(sparse=False, drop='first'))])
 
-
 # This dataset is way too high-dimensional. Better do PCA:
 pca = PCA(n_components=2)
 
@@ -166,8 +166,6 @@ full_pipeline = FeatureUnion(transformer_list=[('numerical_pipeline1', numerical
                                                ('pca_pipeline', pca_pipeline),
                                                ('categorical_pipeline', categorical_pipeline)])
 
-
-
 # Leave it as a dataframe becuase our pipeline is called on a
 # pandas dataframe to extract the appropriate columns, remember?
 X = df_full.drop('isFraud', axis=1)
@@ -183,23 +181,26 @@ print("Combined space has", X_features.shape[1], "features")
 
 
 # LGBM model
-params = {}
-params['learning_rate'] = 0.01
-params['boosting_type'] = 'gbdt'
-params['objective'] = 'binary'
-params['metric'] = 'binary_logloss'
-params['sub_feature'] = 0.5
-params['min_data_in_leaf'] = 200
-params['max_depth'] = -1
-params['is_unbalance'] = True
-params['max_bin'] = 300
-lgbm = LGBMClassifier(**params)
+params = {'learning_rate': 0.1,
+          'n_estimators': 1000,
+          'max_depth': 5,
+          'min_child_weight': 1,
+          'gamma': 0,
+          'subsample': 0.8,
+          'colsample_bytree': 0.8,
+          'objective': 'binary:logistic',
+          'nthread': 4,
+          'scale_pos_weight': 1,
+          'seed': 27}
+
+xgb = XGBClassifier(**params)
 
 pipe = Pipeline(steps=[('full_pipeline', full_pipeline),
                        ('model', lgbm)])
 # Grid search for n_estimators
 param_grid = {
-    'model__num_leaves': range(100, 601, 100)
+    'model__max_depth': range(3, 10, 2),
+    'model__min_child_weight': range(1, 6, 2)
 }
 
 gsearch = GridSearchCV(
@@ -213,26 +214,26 @@ gsearch = GridSearchCV(
 
 print("Grid Search started")
 # print(X.head())
-# gsearch.fit(X_train, y_train)
+gsearch.fit(X_train, y_train)
 
 print("cv_results_:")
-# df_cv = pd.DataFrame.from_dict(gsearch.cv_results_)
-# pprint(pd.DataFrame.from_dict(gsearch.cv_results_))
+df_cv = pd.DataFrame.from_dict(gsearch.cv_results_)
+pprint(pd.DataFrame.from_dict(gsearch.cv_results_))
 
 print("best_params_:")
-# print(gsearch.best_params_)
+print(gsearch.best_params_)
 
 print("****************** Predicting******************")
 
-# y_pred = gsearch.predict_proba(X_test)
+y_pred = gsearch.predict_proba(X_test)
 
-# print("AUC for test set: ", roc_auc_score(y_test, y_pred[:, 1]))
+print("AUC for test set: ", roc_auc_score(y_test, y_pred[:, 1]))
 
 #
-params['num_leaves'] = 600
-lgbm_final = LGBMClassifier(**params)
+params.update(gsearch.best_params_)
+xgb_final = XGBClassifier(**params)
 final_pipeline = Pipeline(steps=[('full_pipeline', full_pipeline),
-                                 ('model', lgbm_final)])
+                                 ('model', xgb_final)])
 
 # Can call fit on it just like any other pipeline
 final_pipeline.fit(X_train, y_train)
