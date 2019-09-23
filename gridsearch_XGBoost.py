@@ -67,11 +67,11 @@ def percentageFraud(df, col, target='isFraud'):
     # pprint(factor_dict)
     return factor_dict
 
-cat_list3 = ['P_emaildomain','card6', 'R_emaildomain', 'id_30', 'id_31', 'id_33', 'id_34']
+cat_list3 = ['P_emaildomain','card6', 'R_emaildomain', 'id_30', 'id_31']
 for col in cat_list3:
     df_full[col] = df_full[col].map(percentageFraud(df=df_full, col=col))
 
-df_full = df_full[:200000]
+# df_full = df_full[:200000]
 # Train Test split
 X = df_full.drop('isFraud', axis=1)
 # You can covert the target variable to numpy
@@ -250,7 +250,7 @@ pipe = Pipeline(steps=[('full_pipeline', full_pipeline),
                        ('model', xgb)])
 # Grid search for n_estimators
 param_grid = {
-    'model__max_depth': range(7, 8, 1),
+    'model__max_depth': range(6, 8, 1),
     'model__min_child_weight': range(1, 3, 1)
 }
 
@@ -261,7 +261,7 @@ gsearch = GridSearchCV(
     # n_jobs=2,
     iid=False,
     verbose=1000,
-    cv=10)
+    cv=5)
 
 print("Grid Search started")
 # print(X.head())
@@ -301,7 +301,7 @@ df_test = pd.merge(df_transaction_test, df_identity_test, left_on='TransactionID
 
 # df_test = pd.read_csv('../input/ieee-fraud-detection/shard1.csv')
 
-df_test = df_test[:10000]
+# df_test = df_test[:10000]
 
 print("Applying final pipeline to 10000 rows ")
 y_pred = gsearch.predict_proba(df_test)
