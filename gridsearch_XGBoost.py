@@ -67,11 +67,13 @@ def percentageFraud(df, col, target='isFraud'):
     # pprint(factor_dict)
     return factor_dict
 
+# cat_list3 = ['card6']
 cat_list3 = ['P_emaildomain','card6', 'R_emaildomain', 'id_30', 'id_31']
+# 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9'
 for col in cat_list3:
     df_full[col] = df_full[col].map(percentageFraud(df=df_full, col=col))
 
-# df_full = df_full[:200000]
+# df_full = df_full[:100000]
 # Train Test split
 X = df_full.drop('isFraud', axis=1)
 # You can covert the target variable to numpy
@@ -174,7 +176,7 @@ cat_list1 = ['ProductCD', 'card4',
              'DeviceType']
 # Categorical features which require some factor levels to be combined
 
-cat_list2 = ['card6', 'P_emaildomain', 'R_emaildomain']
+cat_list2 = ['card6']
 cat_list = ['ProductCD', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'card4', ]
 
 print("Full predictor list: ")
@@ -250,8 +252,8 @@ pipe = Pipeline(steps=[('full_pipeline', full_pipeline),
                        ('model', xgb)])
 # Grid search for n_estimators
 param_grid = {
-    'model__max_depth': range(6, 8, 1),
-    'model__min_child_weight': range(1, 3, 1)
+    'model__max_depth': range(7, 8, 1),
+    'model__min_child_weight': range(1, 2, 1)
 }
 
 gsearch = GridSearchCV(
@@ -263,35 +265,41 @@ gsearch = GridSearchCV(
     verbose=1000,
     cv=5)
 
-print("Grid Search started")
+# print("Grid Search started")
 # print(X.head())
-gsearch.fit(X_train, y_train)
+# gsearch.fit(X_train, y_train)
 
-print("cv_results_:")
-df_cv = pd.DataFrame.from_dict(gsearch.cv_results_)
-pprint(pd.DataFrame.from_dict(gsearch.cv_results_))
+# print("cv_results_:")
+# df_cv = pd.DataFrame.from_dict(gsearch.cv_results_)
+# pprint(pd.DataFrame.from_dict(gsearch.cv_results_))
 
-print("best_params_:")
-print(gsearch.best_params_)
+# print("best_params_:")
+# print(gsearch.best_params_)
 
 print("****************** Predicting******************")
 
-y_pred = gsearch.predict_proba(X_test)
+# y_pred = gsearch.predict_proba(X_test)
 
 # print("AUC for test set: ", roc_auc_score(y_test, y_pred[:, 1]))
 
 #
-# params.update({
-#     'max_depth': 3,
-#     'min_child_weight': 1
-# })
-# xgb_final = XGBClassifier(**params)
-# final_pipeline = Pipeline(steps=[('full_pipeline', full_pipeline),
-#                                  ('model', xgb_final)])
+print(" Training with learnt hyper parameters from grid search")
+params.update({
+    'max_depth': 7,
+    'min_child_weight': 1
+})
+xgb_final = XGBClassifier(**params)
+final_pipeline = Pipeline(steps=[('full_pipeline', full_pipeline),
+                                 ('model', xgb_final)])
 
 # Can call fit on it just like any other pipeline
 final_pipeline.fit(X_train, y_train)
 print("AUC for test set: ", roc_auc_score(y_test, final_pipeline.predict_proba(X_test)[:, 1]))
+
+# Saving the model piepline
+# Export the classifier to a file
+from sklearn.externals import joblib
+joblib.dump(final_pipeline, 'Models/xgboost_model.joblib')
 
 print("******************** Generating the submission file******************")
 df_transaction_test = pd.read_csv('Data/test_transaction.csv')
@@ -303,8 +311,11 @@ df_test = pd.merge(df_transaction_test, df_identity_test, left_on='TransactionID
 
 # df_test = df_test[:10000]
 
+for col in cat_list3:
+    df_test[col] = df_test[col].map(percentageFraud(df=df_full, col=col))
+
 print("Applying final pipeline to 10000 rows ")
-y_pred = gsearch.predict_proba(df_test)
+y_pred = final_pipeline.predict_proba(df_test)
 
 df_score = pd.DataFrame({'isFraud': y_pred[:, 1]})
 df_score['TransactionID'] = df_test['TransactionID']

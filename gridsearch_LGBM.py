@@ -8,6 +8,20 @@ import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
 from pprint import pprint
 from sklearn.preprocessing import OneHotEncoder
 
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import FeatureUnion, Pipeline
+from sklearn.decomposition import PCA
+from sklearn.feature_selection import SelectKBest
+from sklearn.preprocessing import Normalizer
+from sklearn.metrics import roc_auc_score
+
+# Building the model using the feature pipeline
+from lightgbm import LGBMClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV
+
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.max_rows', 500)
 pd.set_option('display.width', 1000)
@@ -32,21 +46,45 @@ df_identity = pd.read_csv('Data/train_identity.csv')
 
 df_full = pd.merge(df_transaction, df_identity, left_on='TransactionID', right_on='TransactionID', how='left')
 
+
 # df_full = df_full[:10000]
 
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.impute import SimpleImputer
-from sklearn.pipeline import FeatureUnion, Pipeline
-from sklearn.decomposition import PCA
-from sklearn.feature_selection import SelectKBest
-from sklearn.preprocessing import Normalizer
-from sklearn.metrics import roc_auc_score
+# Utility functions
+def percentageFraud(df, col, target='isFraud'):
+    table_train = pd.crosstab(df[col], df[target])
+    table_train['%fraud'] = (table_train[1] / (table_train[0] + table_train[1])) * 100
+    table_train = table_train.sort_values(by='%fraud', ascending=False)
+    table_train['index'] = table_train.index
+    factor_dict = {}
+    # List of factor levels where %fraud > 0
+    key_list = list(table_train[table_train['%fraud'] > 0]['index'])
+    for key in key_list:
+        value = key
+        factor_dict[key] = value
+    # List of factor levels where %fraud == 0
+    factor_levels = set(table_train['index'])
+    for key in key_list:
+        factor_levels.discard(key)
+    for key in factor_levels:
+        factor_dict[key] = 'other'
+    # pprint(factor_dict)
+    return factor_dict
 
-# Building the model using the feature pipeline
-from lightgbm import LGBMClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import GridSearchCV
+
+# cat_list3 = ['card6']
+cat_list3 = ['P_emaildomain', 'card6', 'R_emaildomain', 'id_30', 'id_31']
+# 'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9'
+for col in cat_list3:
+    df_full[col] = df_full[col].map(percentageFraud(df=df_full, col=col))
+
+# Leave it as a dataframe becuase our pipeline is called on a
+# pandas dataframe to extract the appropriate columns, remember?
+X = df_full.drop('isFraud', axis=1)
+# You can covert the target variable to numpy
+y = df_full['isFraud'].values
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
 
 # Custom Transformer that extracts columns passed as argument to its constructor
 # BaseEstimator and TransformerMixin are base classes which are inherited
@@ -112,7 +150,7 @@ null_list2 = ['D4', 'D6', 'D12', 'D14']
 # Numeric columns which have NULL values replaced with -1
 null_list1 = ['dist1', 'dist2', 'D1', 'D2', 'D7', 'D8', 'D9']
 # PCA list
-v_list=[]
+v_list = []
 for col in df_full:
     if 'V' in col:
         # print(col)
@@ -146,6 +184,9 @@ categorical_pipeline = Pipeline(steps=[('cat_selector', FeatureSelector(cat_list
                                        ('imputer', SimpleImputer(strategy="constant", fill_value=None)),
                                        ('one_hot_encoder', OneHotEncoder(sparse=False, drop='first'))])
 
+cat_pipe = Pipeline(steps=[('cat_selector', FeatureSelector(cat_list3)),
+                           ('imputer', SimpleImputer(strategy="constant", fill_value='Missing')),
+                           ('one_hot_encoder', OneHotEncoder(sparse=False, drop='first'))])
 
 # This dataset is way too high-dimensional. Better do PCA:
 pca = PCA(n_components=2)
@@ -164,17 +205,9 @@ full_pipeline = FeatureUnion(transformer_list=[('numerical_pipeline1', numerical
                                                ('numerical_pipeline2', numerical_pipeline2),
                                                ('numerical_pipeline3', numerical_pipeline3),
                                                ('pca_pipeline', pca_pipeline),
+                                               ('condense_factor', cat_pipe),
                                                ('categorical_pipeline', categorical_pipeline)])
 
-
-
-# Leave it as a dataframe becuase our pipeline is called on a
-# pandas dataframe to extract the appropriate columns, remember?
-X = df_full.drop('isFraud', axis=1)
-# You can covert the target variable to numpy
-y = df_full['isFraud'].values
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 # Use combined features to transform dataset:
 X_features = full_pipeline.fit(X_train, y_train).transform(X_train)
 print("Shape of combined space ", X_features.shape, "features")
@@ -189,17 +222,25 @@ params['boosting_type'] = 'gbdt'
 params['objective'] = 'binary'
 params['metric'] = 'binary_logloss'
 params['sub_feature'] = 0.5
-params['min_data_in_leaf'] = 200
-params['max_depth'] = -1
+params['min_data_in_leaf'] = 100
+# params['max_depth'] = -1
+params['num_leaves'] = 600
 params['is_unbalance'] = True
 params['max_bin'] = 300
+# params['max_depth'] = 8
+params['subsample'] = 0.8
+params['feature_fraction']= 0.4
+
 lgbm = LGBMClassifier(**params)
 
 pipe = Pipeline(steps=[('full_pipeline', full_pipeline),
                        ('model', lgbm)])
 # Grid search for n_estimators
 param_grid = {
-    'model__num_leaves': range(100, 601, 100)
+    #'model__min_data_in_leaf':range(100,1001,100),
+    #'model__num_leaves': range(100, 601, 100)
+    'model__max_depth':range(5,16,2),
+    'model__min_samples_split':range(200,1001,200)
 }
 
 gsearch = GridSearchCV(
@@ -213,21 +254,21 @@ gsearch = GridSearchCV(
 
 print("Grid Search started")
 # print(X.head())
-# gsearch.fit(X_train, y_train)
+gsearch.fit(X_train, y_train)
 
 print("cv_results_:")
-# df_cv = pd.DataFrame.from_dict(gsearch.cv_results_)
-# pprint(pd.DataFrame.from_dict(gsearch.cv_results_))
+df_cv = pd.DataFrame.from_dict(gsearch.cv_results_)
+pprint(pd.DataFrame.from_dict(gsearch.cv_results_))
 
 print("best_params_:")
-# print(gsearch.best_params_)
+print(gsearch.best_params_)
 
 print("****************** Predicting******************")
 
-# y_pred = gsearch.predict_proba(X_test)
+y_pred = gsearch.predict_proba(X_test)
 
-# print("AUC for test set: ", roc_auc_score(y_test, y_pred[:, 1]))
-
+print("AUC for test set: ", roc_auc_score(y_test, y_pred[:, 1]))
+exit(-1)
 #
 params['num_leaves'] = 600
 lgbm_final = LGBMClassifier(**params)
@@ -238,10 +279,21 @@ final_pipeline = Pipeline(steps=[('full_pipeline', full_pipeline),
 final_pipeline.fit(X_train, y_train)
 print("AUC for test set: ", roc_auc_score(y_test, final_pipeline.predict_proba(X_test)[:, 1]))
 
+
+# Saving the model piepline
+# Export the classifier to a file
+from sklearn.externals import joblib
+joblib.dump(final_pipeline, 'Models/lgbm_model.joblib')
+
+
 print("******************** Generating the submission file******************")
 df_transaction_test = pd.read_csv('Data/test_transaction.csv')
 df_identity_test = pd.read_csv('Data/test_identity.csv')
 df_test = pd.merge(df_transaction_test, df_identity_test, left_on='TransactionID', right_on='TransactionID', how='left')
+
+
+for col in cat_list3:
+    df_test[col] = df_test[col].map(percentageFraud(df=df_full, col=col))
 
 y_pred = final_pipeline.predict_proba(df_test)
 
@@ -251,4 +303,4 @@ df_score = df_score[['TransactionID', 'isFraud']]
 
 print(df_score.head())
 
-df_score.to_csv('Data/Submission/submission.csv', index=False)
+df_score.to_csv('Data/Submission/LGBM/submission.csv', index=False)
